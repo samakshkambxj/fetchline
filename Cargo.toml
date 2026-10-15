@@ -1,4 +1,4 @@
 # Copyright 2026 Samaksh Kamboj - SPDX-License-Identifier: Apache-2.0
 [workspace]
-members = ["crates/fetchline-core"]
+members = ["crates/fetchline-core", "crates/fetchline-daemon", "crates/fetchline-cli"]
 resolver = "2"
