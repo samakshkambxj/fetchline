@@ -296,14 +296,18 @@ pub(crate) fn write_state_file(path: &Path, state: &DownloadState) -> Result<(),
     Ok(())
 }
 
+/// Grow (or shrink) the output file to `total` without touching existing
+/// bytes when the size already matches. Resume depends on this: fetched
+/// segments must survive a second preallocate call.
 fn preallocate(path: &Path, total: u64) -> Result<(), String> {
     let file = OpenOptions::new()
         .create(true)
-        .truncate(true)
         .write(true)
         .open(path)
         .map_err(|e| e.to_string())?;
-    file.set_len(total).map_err(|e| e.to_string())?;
+    if file.metadata().map_err(|e| e.to_string())?.len() != total {
+        file.set_len(total).map_err(|e| e.to_string())?;
+    }
     Ok(())
 }
 
@@ -383,12 +387,34 @@ fn sha256_of(path: &Path) -> Result<String, String> {
 }
 
 #[cfg(test)]
+mod preallocate_tests {
+    use super::*;
+
+    #[test]
+    fn preserves_existing_bytes() {
+        let path = std::env::temp_dir().join("fetchline-prealloc.bin");
+        let _ = fs::remove_file(&path);
+        fs::write(&path, b"hello world").unwrap();
+        preallocate(&path, 11).unwrap();
+        assert_eq!(fs::read(&path).unwrap(), b"hello world");
+        preallocate(&path, 20).unwrap();
+        let grown = fs::read(&path).unwrap();
+        assert_eq!(grown.len(), 20);
+        assert_eq!(&grown[..11], b"hello world");
+        preallocate(&path, 5).unwrap();
+        assert_eq!(fs::read(&path).unwrap(), b"hello");
+        let _ = fs::remove_file(&path);
+    }
+}
+
+#[cfg(test)]
 mod integration {
     use super::*;
     use std::process::{Child, Command};
     use std::sync::Arc;
 
     fn start_server(port: u16, size: usize) -> Child {
+        use std::process::Stdio;
         let script = concat!(env!("CARGO_MANIFEST_DIR"), "/../../scripts/range_server.py");
         Command::new("python3")
             .arg(script)
@@ -396,6 +422,10 @@ mod integration {
             .arg(port.to_string())
             .arg("--size")
             .arg(size.to_string())
+            // Detach from the test harness pipes so a stray child can
+            // never hold them open.
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
             .spawn()
             .expect("range_server starts")
     }
