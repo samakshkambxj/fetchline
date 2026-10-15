@@ -24,6 +24,7 @@ pub struct Engine {
     client: reqwest::blocking::Client,
     pub(crate) sync_interval: Duration,
     limiter: Option<Arc<Limiter>>,
+    control: Option<Arc<Control>>,
 }
 
 impl Engine {
@@ -47,7 +48,12 @@ impl Engine {
             .user_agent(concat!("fetchline/", env!("CARGO_PKG_VERSION")))
             .build()
             .map_err(|e| e.to_string())?;
-        Ok(Self { client, sync_interval, limiter: None })
+        Ok(Self { client, sync_interval, limiter: None, control: None })
+    }
+
+    /// Cooperative pause/cancel shared with the caller (the daemon).
+    pub fn with_control(&mut self, control: Arc<Control>) {
+        self.control = Some(control);
     }
 
     /// HEAD probe: length, Range support, ETag, filename.
@@ -171,12 +177,22 @@ impl Engine {
                 }
                 let client = self.client.clone();
                 let limiter = self.limiter.clone();
+                let control = self.control.clone();
                 let url = url.to_string();
                 let output = output.to_path_buf();
                 let end = seg.end;
                 let done = &dones[i];
                 handles.push(scope.spawn(move || {
-                    fetch_segment(&client, &url, &output, from, end, done, limiter.as_deref())
+                    fetch_segment(
+                        &client,
+                        &url,
+                        &output,
+                        from,
+                        end,
+                        done,
+                        limiter.as_deref(),
+                        control.as_deref(),
+                    )
                 }));
             }
             let mut first_err: Option<String> = None;
@@ -229,6 +245,42 @@ impl Default for Engine {
     }
 }
 
+/// Cooperative transfer control. The daemon flips these flags;
+/// workers check them after every 64 KiB chunk.
+#[derive(Debug, Default)]
+pub struct Control {
+    paused: AtomicBool,
+    cancelled: AtomicBool,
+}
+
+/// Sentinel errors (matched with `==`, never shown raw to users).
+pub const PAUSED: &str = "transfer paused";
+pub const CANCELLED: &str = "transfer cancelled";
+
+impl Control {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn pause(&self) {
+        self.paused.store(true, Ordering::Relaxed);
+    }
+
+    pub fn cancel(&self) {
+        self.cancelled.store(true, Ordering::Relaxed);
+    }
+
+    fn check(&self) -> Result<(), String> {
+        if self.cancelled.load(Ordering::Relaxed) {
+            return Err(CANCELLED.into());
+        }
+        if self.paused.load(Ordering::Relaxed) {
+            return Err(PAUSED.into());
+        }
+        Ok(())
+    }
+}
+
 pub fn state_path_for(output: &Path) -> PathBuf {
     let mut name = output.as_os_str().to_owned();
     name.push(".state.json");
@@ -258,6 +310,7 @@ fn fetch_segment(
     end: u64,
     done: &AtomicU64,
     limiter: Option<&Limiter>,
+    control: Option<&Control>,
 ) -> Result<(), String> {
     let mut attempt = 0;
     let mut offset = start;
@@ -281,6 +334,9 @@ fn fetch_segment(
                     done.fetch_add(n as u64, Ordering::Relaxed);
                     if let Some(lim) = limiter {
                         lim.consume(n as u64);
+                    }
+                    if let Some(ctrl) = control {
+                        ctrl.check()?;
                     }
                 }
                 if offset > end + 1 {
@@ -324,6 +380,7 @@ fn sha256_of(path: &Path) -> Result<String, String> {
 mod integration {
     use super::*;
     use std::process::{Child, Command};
+    use std::sync::Arc;
 
     fn start_server(port: u16, size: usize) -> Child {
         let script = concat!(env!("CARGO_MANIFEST_DIR"), "/../../scripts/range_server.py");
@@ -426,6 +483,7 @@ mod integration {
             s0.end,
             &done0,
             None,
+            None,
         )
         .unwrap();
         state.segments[0].done = done0.load(Ordering::Relaxed);
@@ -437,6 +495,39 @@ mod integration {
         let data = fs::read(&out).unwrap();
         assert!(data.iter().enumerate().all(|(i, b)| *b == (i % 256) as u8));
         let _ = fs::remove_file(&out);
+        server.kill().ok();
+    }
+
+    #[test]
+    fn pause_then_resume() {
+        let port = 18769;
+        let size = 1_048_576usize; // 1 MiB throttled to 256 KiB/s: ~4s window to pause
+        let mut server = start_server(port, size);
+        wait_ready(port);
+        let dir = std::env::temp_dir().join("fetchline-m1");
+        let _ = fs::create_dir_all(&dir);
+        let out = dir.join("paused.bin");
+        let _ = fs::remove_file(&out);
+        let _ = fs::remove_file(state_path_for(&out));
+        let mut engine = Engine::with_speed_limit(256 * 1024).unwrap();
+        let ctrl = Arc::new(Control::new());
+        engine.with_control(ctrl.clone());
+        let url = format!("http://127.0.0.1:{port}/file.bin");
+        let handle = std::thread::spawn(move || engine.download(&url, &out, 1, None));
+        std::thread::sleep(Duration::from_millis(300));
+        ctrl.pause();
+        let err = handle.join().unwrap().unwrap_err();
+        assert_eq!(err, PAUSED);
+        let sp = state_path_for(&dir.join("paused.bin"));
+        assert!(sp.exists(), "partial state must survive pause");
+        let partial: DownloadState =
+            serde_json::from_str(&fs::read_to_string(&sp).unwrap()).unwrap();
+        assert!(partial.validate().is_ok() && !partial.is_complete());
+        let done = Engine::new().unwrap().resume(&sp).unwrap();
+        assert!(done.is_complete());
+        let data = fs::read(dir.join("paused.bin")).unwrap();
+        assert!(data.iter().enumerate().all(|(i, b)| *b == (i % 256) as u8));
+        let _ = fs::remove_file(dir.join("paused.bin"));
         server.kill().ok();
     }
 
