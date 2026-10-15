@@ -4,7 +4,7 @@
 use std::fs::{self, File, OpenOptions};
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::Duration;
 
 use sha2::{Digest, Sha256};
@@ -19,16 +19,21 @@ const MAX_RETRIES: u32 = 3;
 /// the underlying client pools connections.
 pub struct Engine {
     client: reqwest::blocking::Client,
+    pub(crate) sync_interval: Duration,
 }
 
 impl Engine {
     pub fn new() -> Result<Self, String> {
+        Self::with_sync_interval(Duration::from_millis(500))
+    }
+
+    pub fn with_sync_interval(sync_interval: Duration) -> Result<Self, String> {
         let client = reqwest::blocking::Client::builder()
             .timeout(Duration::from_secs(30))
             .user_agent(concat!("fetchline/", env!("CARGO_PKG_VERSION")))
             .build()
             .map_err(|e| e.to_string())?;
-        Ok(Self { client })
+        Ok(Self { client, sync_interval })
     }
 
     /// HEAD probe: length, Range support, ETag, filename.
@@ -129,7 +134,21 @@ impl Engine {
         // `AtomicU64` is `Sync`, so scoped threads may borrow them.
         let dones: Vec<AtomicU64> =
             state.segments.iter().map(|s| AtomicU64::new(s.done)).collect();
+        // Crash-pause support: snapshot progress to state.json every
+        // `sync_interval` so killing the process mid-transfer still resumes.
+        let sync_stop = AtomicBool::new(false);
+        let snapshot = state.clone();
         std::thread::scope(|scope| {
+            let sync_handle = scope.spawn(|| {
+                while !sync_stop.load(Ordering::Relaxed) {
+                    std::thread::sleep(self.sync_interval);
+                    let mut snap = snapshot.clone();
+                    for (seg, done) in snap.segments.iter_mut().zip(&dones) {
+                        seg.done = done.load(Ordering::Relaxed);
+                    }
+                    let _ = write_state_file(&state_path, &snap);
+                }
+            });
             let mut handles = Vec::new();
             for (i, seg) in state.segments.iter().enumerate() {
                 let from = seg.start + seg.done;
@@ -153,6 +172,8 @@ impl Engine {
                     }
                 }
             }
+            sync_stop.store(true, Ordering::Relaxed);
+            let _ = sync_handle.join();
             if let Some(e) = first_err {
                 return Err(e);
             }
@@ -162,10 +183,7 @@ impl Engine {
             seg.done = done.load(Ordering::Relaxed);
         }
         // Persist resume state atomically for the next run (or crash).
-        let tmp = state_path.with_extension("json.tmp");
-        let raw = serde_json::to_string(state).map_err(|e| e.to_string())?;
-        fs::write(&tmp, raw).map_err(|e| e.to_string())?;
-        fs::rename(&tmp, &state_path).map_err(|e| e.to_string())?;
+        write_state_file(&state_path, state)?;
         if !state.is_complete() {
             return Err("transfer incomplete after all segments".into());
         }
@@ -200,6 +218,15 @@ pub fn state_path_for(output: &Path) -> PathBuf {
     let mut name = output.as_os_str().to_owned();
     name.push(".state.json");
     PathBuf::from(name)
+}
+
+/// Atomic state write (tmp + rename) so a crash never leaves half JSON.
+pub(crate) fn write_state_file(path: &Path, state: &DownloadState) -> Result<(), String> {
+    let tmp = path.with_extension("json.tmp");
+    let raw = serde_json::to_string(state).map_err(|e| e.to_string())?;
+    fs::write(&tmp, raw).map_err(|e| e.to_string())?;
+    fs::rename(&tmp, path).map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 fn preallocate(path: &Path, total: u64) -> Result<(), String> {
@@ -330,8 +357,23 @@ mod integration {
     }
 
     #[test]
-    fn resume_completes_partial_state() {
-        let port = 18767;
+    fn state_snapshot_round_trips() {
+        use crate::segments::plan;
+        let segs = plan(Some(1000), 4, true);
+        let mut st = DownloadState::fresh("u", "o", Some(1000), 4, &segs, None, true);
+        st.segments[0].done = 250;
+        let path = std::env::temp_dir().join("fetchline-snap.state.json");
+        write_state_file(&path, &st).unwrap();
+        let back: DownloadState =
+            serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+        assert!(back.validate().is_ok());
+        assert_eq!(back.segments[0].done, 250);
+        assert!(!back.is_complete());
+        let _ = fs::remove_file(&path);
+    }
+
+    #[test]
+    fn resume_completes_partial_state() {        let port = 18767;
         let size = 262_144usize;
         let mut server = start_server(port, size);
         wait_ready(port);
