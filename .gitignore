@@ -1,8 +1,7 @@
 # Copyright 2026 Samaksh Kamboj - SPDX-License-Identifier: Apache-2.0
-# Rust
+# Rust (bins only; workspace lockfile is committed)
 /target/
 **/*.rs.bk
-Cargo.lock
 
 # Tauri
 src-tauri/target/
