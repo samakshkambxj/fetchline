@@ -1,0 +1,6 @@
+<!-- Copyright 2026 Samaksh Kamboj - SPDX-License-Identifier: Apache-2.0 -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <rect x="8" y="8" width="112" height="112" rx="28" fill="#00696B"/>
+  <path d="M64 28v52M40 64l24 24 24-24" fill="none" stroke="#fff" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="36" y="96" width="56" height="8" rx="4" fill="#6FF7F9"/>
+</svg>

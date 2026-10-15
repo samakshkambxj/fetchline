@@ -38,4 +38,38 @@ class MockBackend {
     document.dispatchEvent(new CustomEvent("fetchline:update"));
   }
 }
-window.fetchlineBackend = new MockBackend();
+// TauriBackend speaks to fetchlined through the app shell's invoke
+// handlers (src-tauri/src/proxy.rs). Same method surface as MockBackend.
+class TauriBackend {
+  constructor(core) {
+    this.core = core;
+    // No push channel from the daemon yet; poll for progress.
+    setInterval(() => document.dispatchEvent(new CustomEvent("fetchline:update")), 1000);
+  }
+  async list() {
+    const r = await this.core.invoke("dl_list", { status: null });
+    return (r.downloads || []).map((d) => ({
+      id: d.id,
+      filename: d.filename,
+      status: d.status,
+      downloadedBytes: d.downloadedBytes || 0,
+      totalBytes: d.totalBytes,
+      connections: d.connections,
+      scheduledAt: d.scheduledAt,
+      error: d.error,
+    }));
+  }
+  async add(urls, connections) {
+    await this.core.invoke("dl_add", { urls: urls.slice(0, 100), connections });
+    document.dispatchEvent(new CustomEvent("fetchline:update"));
+  }
+  async act(id, action) {
+    await this.core.invoke("dl_act", { action, id });
+    document.dispatchEvent(new CustomEvent("fetchline:update"));
+  }
+}
+if (window.__TAURI__ && window.__TAURI__.core) {
+  window.fetchlineBackend = new TauriBackend(window.__TAURI__.core);
+} else {
+  window.fetchlineBackend = new MockBackend();
+}
