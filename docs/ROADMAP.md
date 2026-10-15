@@ -17,18 +17,18 @@ Commit style: Conventional Commits (`feat:`, `fix:`, `docs:`, `chore:`,
 - [x] Repo `samakshkambxj/fetchline`, Apache-2.0, `.gitignore`
 - [x] Layout: `src-tauri/ ui/ browser/ scripts/ docs/`
 
-## M1 — Core engine (v0.1.0)
+## M1 — Core engine (v0.1.0) — done
 
-`src-tauri/src/download/`
+`crates/fetchline-core/` — 15 tests pass (`cargo test -p fetchline-core`).
 
-- [ ] HEAD probe: length, `Accept-Ranges`, filename from `Content-Disposition`
-- [ ] Segmented GET 1–16 parts, `Range` requests, preallocated file + offset writes
-- [ ] Single-connection fallback when Range unsupported
-- [ ] Pause/resume via `.state.json` per download
-- [ ] Retry with exponential backoff, per-segment error isolation
-- [ ] Global + per-download speed limiter (token bucket)
-- [ ] SHA-256 verify opt-in
-- [ ] Unit tests: local Range-capable test server, resume, fallback
+- [x] HEAD probe: length, `Accept-Ranges`, filename from `Content-Disposition`
+- [x] Segmented GET 1–16 parts, `Range` requests, preallocated file + offset writes
+- [x] Single-connection fallback when Range unsupported
+- [x] Pause/resume via `.state.json` per download (500ms sync thread)
+- [x] Retry with exponential backoff, per-segment error isolation
+- [x] Global + per-download speed limiter (token bucket)
+- [x] SHA-256 verify opt-in
+- [x] Unit tests: local Range-capable test server, resume, fallback
 
 Accept: 100MB file from local server downloads in N segments,
 byte-identical, pause at 50% resumes correctly.
