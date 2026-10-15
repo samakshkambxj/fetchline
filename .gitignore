@@ -34,6 +34,7 @@ __pycache__/
 *.swo
 
 # Packaging
+src-tauri/binaries/
 bin/
 *.tar.gz
 *.zip
