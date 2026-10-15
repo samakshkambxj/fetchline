@@ -1,0 +1,41 @@
+# Copyright 2026 Samaksh Kamboj - SPDX-License-Identifier: Apache-2.0
+# Rust
+/target/
+**/*.rs.bk
+Cargo.lock
+
+# Tauri
+src-tauri/target/
+src-tauri/gen/
+src-tauri/*.AppImage
+*.AppImage
+*.deb
+*.rpm
+
+# Node (tooling only)
+node_modules/
+dist/
+*.log
+
+# Python (scripts)
+__pycache__/
+*.pyc
+.venv/
+
+# SQLite / local state
+*.sqlite3
+*.sqlite3-journal
+*.db
+
+# OS / editors
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Packaging
+bin/
+*.tar.gz
+*.zip
+SHA256SUMS
