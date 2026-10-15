@@ -1,0 +1,125 @@
+/* Copyright 2026 Samaksh Kamboj - SPDX-License-Identifier: Apache-2.0 */
+/* fetchline M3 Expressive tokens. Single seed, hand-rolled tonal pairs. */
+
+:root {
+  color-scheme: light;
+
+  /* Seed #00696B (teal). Tonal pairs follow M3 roles. */
+  --md-sys-color-primary: #00696b;
+  --md-sys-color-on-primary: #ffffff;
+  --md-sys-color-primary-container: #6ff7f9;
+  --md-sys-color-on-primary-container: #002020;
+  --md-sys-color-secondary: #4a6363;
+  --md-sys-color-on-secondary: #ffffff;
+  --md-sys-color-secondary-container: #cce8e7;
+  --md-sys-color-on-secondary-container: #051f1f;
+  --md-sys-color-tertiary: #4d5f7c;
+  --md-sys-color-tertiary-container: #d4e3ff;
+  --md-sys-color-error: #ba1a1a;
+  --md-sys-color-on-error: #ffffff;
+  --md-sys-color-error-container: #ffdad6;
+
+  --md-sys-color-surface: #f4faf9;
+  --md-sys-color-on-surface: #161d1d;
+  --md-sys-color-surface-variant: #dae5e3;
+  --md-sys-color-on-surface-variant: #3f4948;
+  --md-sys-color-surface-container-lowest: #ffffff;
+  --md-sys-color-surface-container-low: #eef4f3;
+  --md-sys-color-surface-container: #e8efee;
+  --md-sys-color-surface-container-high: #e2e9e8;
+  --md-sys-color-surface-container-highest: #dce4e3;
+  --md-sys-color-outline: #6f7979;
+  --md-sys-color-outline-variant: #bec9c8;
+  --md-sys-color-scrim: #000000;
+
+  /* Shape: expressive scale leans on L/XL/full. */
+  --md-sys-shape-corner-none: 0;
+  --md-sys-shape-corner-xs: 4px;
+  --md-sys-shape-corner-s: 8px;
+  --md-sys-shape-corner-m: 12px;
+  --md-sys-shape-corner-l: 16px;
+  --md-sys-shape-corner-xl: 28px;
+  --md-sys-shape-corner-full: 999px;
+
+  /* Type scale (system stack, M3 sizes). */
+  --md-sys-typescale-display-m: 700 45px/52px system-ui, sans-serif;
+  --md-sys-typescale-headline-s: 600 24px/32px system-ui, sans-serif;
+  --md-sys-typescale-title-l: 600 22px/28px system-ui, sans-serif;
+  --md-sys-typescale-title-m: 600 16px/24px system-ui, sans-serif;
+  --md-sys-typescale-body-l: 400 16px/24px system-ui, sans-serif;
+  --md-sys-typescale-body-m: 400 14px/20px system-ui, sans-serif;
+  --md-sys-typescale-label-l: 600 14px/20px system-ui, sans-serif;
+  --md-sys-typescale-label-m: 600 12px/16px system-ui, sans-serif;
+
+  /* Motion: emphasized easing for sheets/dialogs. */
+  --md-sys-motion-emphasized: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --md-sys-motion-standard: cubic-bezier(0.2, 0, 0, 1);
+  --md-sys-motion-duration-s: 150ms;
+  --md-sys-motion-duration-m: 300ms;
+  --md-sys-motion-duration-l: 500ms;
+
+  --md-sys-state-hover: 0.08;
+  --md-sys-state-press: 0.12;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --md-sys-color-primary: #4cdadb;
+  --md-sys-color-on-primary: #003737;
+  --md-sys-color-primary-container: #004f50;
+  --md-sys-color-on-primary-container: #6ff7f9;
+  --md-sys-color-secondary: #b0cccb;
+  --md-sys-color-on-secondary: #1b3534;
+  --md-sys-color-secondary-container: #334b4a;
+  --md-sys-color-on-secondary-container: #cce8e7;
+  --md-sys-color-tertiary: #b4c7e9;
+  --md-sys-color-tertiary-container: #35496a;
+  --md-sys-color-error: #ffb4ab;
+  --md-sys-color-on-error: #690005;
+  --md-sys-color-error-container: #93000a;
+
+  --md-sys-color-surface: #0e1514;
+  --md-sys-color-on-surface: #dde4e3;
+  --md-sys-color-surface-variant: #3f4948;
+  --md-sys-color-on-surface-variant: #bec9c8;
+  --md-sys-color-surface-container-lowest: #090f0e;
+  --md-sys-color-surface-container-low: #161d1d;
+  --md-sys-color-surface-container: #1a2221;
+  --md-sys-color-surface-container-high: #252d2c;
+  --md-sys-color-surface-container-highest: #2f3837;
+  --md-sys-color-outline: #889392;
+  --md-sys-color-outline-variant: #3f4948;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="system"] {
+    color-scheme: dark;
+
+    --md-sys-color-primary: #4cdadb;
+    --md-sys-color-on-primary: #003737;
+    --md-sys-color-primary-container: #004f50;
+    --md-sys-color-on-primary-container: #6ff7f9;
+    --md-sys-color-secondary: #b0cccb;
+    --md-sys-color-on-secondary: #1b3534;
+    --md-sys-color-secondary-container: #334b4a;
+    --md-sys-color-on-secondary-container: #cce8e7;
+    --md-sys-color-tertiary: #b4c7e9;
+    --md-sys-color-tertiary-container: #35496a;
+    --md-sys-color-error: #ffb4ab;
+    --md-sys-color-on-error: #690005;
+    --md-sys-color-error-container: #93000a;
+
+    --md-sys-color-surface: #0e1514;
+    --md-sys-color-on-surface: #dde4e3;
+    --md-sys-color-surface-variant: #3f4948;
+    --md-sys-color-on-surface-variant: #bec9c8;
+    --md-sys-color-surface-container-lowest: #090f0e;
+    --md-sys-color-surface-container-low: #161d1d;
+    --md-sys-color-surface-container: #1a2221;
+    --md-sys-color-surface-container-high: #252d2c;
+    --md-sys-color-surface-container-highest: #2f3837;
+    --md-sys-color-outline: #889392;
+    --md-sys-color-outline-variant: #3f4948;
+  }
+}
