@@ -80,7 +80,12 @@
   }
 
   async function refresh() {
-    items = await backend().list();
+    try {
+      items = await backend().list();
+    } catch (e) {
+      items = [];
+      snack("Daemon unreachable — start fetchlined");
+    }
     render();
   }
 

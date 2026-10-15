@@ -40,14 +40,17 @@ class MockBackend {
 }
 // TauriBackend speaks to fetchlined through the app shell's invoke
 // handlers (src-tauri/src/proxy.rs). Same method surface as MockBackend.
+// Detection uses window.__TAURI_INVOKE__, the stable primitive the
+// official @tauri-apps/api client itself calls (window.__TAURI__.core
+// is not populated in Tauri v2 webviews).
 class TauriBackend {
-  constructor(core) {
-    this.core = core;
+  constructor(invoke) {
+    this.invoke = invoke;
     // No push channel from the daemon yet; poll for progress.
     setInterval(() => document.dispatchEvent(new CustomEvent("fetchline:update")), 1000);
   }
   async list() {
-    const r = await this.core.invoke("dl_list", { status: null });
+    const r = await this.invoke("dl_list", { status: null });
     return (r.downloads || []).map((d) => ({
       id: d.id,
       filename: d.filename,
@@ -60,16 +63,16 @@ class TauriBackend {
     }));
   }
   async add(urls, connections) {
-    await this.core.invoke("dl_add", { urls: urls.slice(0, 100), connections });
+    await this.invoke("dl_add", { urls: urls.slice(0, 100), connections });
     document.dispatchEvent(new CustomEvent("fetchline:update"));
   }
   async act(id, action) {
-    await this.core.invoke("dl_act", { action, id });
+    await this.invoke("dl_act", { action, id });
     document.dispatchEvent(new CustomEvent("fetchline:update"));
   }
 }
-if (window.__TAURI__ && window.__TAURI__.core) {
-  window.fetchlineBackend = new TauriBackend(window.__TAURI__.core);
+if (typeof window.__TAURI_INVOKE__ === "function") {
+  window.fetchlineBackend = new TauriBackend(window.__TAURI_INVOKE__);
 } else {
   window.fetchlineBackend = new MockBackend();
 }
