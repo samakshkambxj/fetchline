@@ -63,13 +63,13 @@ jobs:
           name: app-bundles
           path: bundles/
       - run: |
-          tar -czf fetchline-cli-x86_64.tar.gz -C dist fetchline fetchlined
-          (cd dist && sha256sum fetchline fetchlined > SHA256SUMS)
-          (cd bundles && sha256sum * > SHA256SUMS 2>/dev/null || true)
+          mkdir -p assets
+          cp dist/fetchline dist/fetchlined assets/
+          tar -czf assets/fetchline-cli-x86_64.tar.gz -C assets fetchline fetchlined
+          rm assets/fetchline assets/fetchlined
+          find bundles -type f \( -name "*.AppImage" -o -name "*.deb" \) -exec cp {} assets/ \;
+          (cd assets && sha256sum * > SHA256SUMS)
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          files: |
-            fetchline-cli-x86_64.tar.gz
-            dist/SHA256SUMS
-            bundles/*
+          files: assets/*
