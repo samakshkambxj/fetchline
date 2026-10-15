@@ -6,6 +6,7 @@ pub mod ipc;
 pub mod library;
 pub mod limit;
 pub mod probe;
+pub mod proxy;
 pub mod segments;
 pub mod state;
 pub mod store;
