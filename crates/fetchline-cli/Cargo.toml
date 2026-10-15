@@ -1,0 +1,14 @@
+# Copyright 2026 Samaksh Kamboj - SPDX-License-Identifier: Apache-2.0
+[package]
+name = "fetchline"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+
+[[bin]]
+name = "fetchline"
+path = "src/main.rs"
+
+[dependencies]
+fetchline-core = { path = "../fetchline-core" }
+serde_json = "1"
