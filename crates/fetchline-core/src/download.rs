@@ -9,6 +9,9 @@ use std::time::Duration;
 
 use sha2::{Digest, Sha256};
 
+use std::sync::Arc;
+
+use crate::limit::Limiter;
 use crate::probe::{ProbeResult, filename_from_disposition, filename_from_url};
 use crate::segments::plan;
 use crate::state::DownloadState;
@@ -20,11 +23,22 @@ const MAX_RETRIES: u32 = 3;
 pub struct Engine {
     client: reqwest::blocking::Client,
     pub(crate) sync_interval: Duration,
+    limiter: Option<Arc<Limiter>>,
 }
 
 impl Engine {
     pub fn new() -> Result<Self, String> {
         Self::with_sync_interval(Duration::from_millis(500))
+    }
+
+    /// Cap total throughput (all segments combined) at `bytes_per_sec`.
+    /// `0` means unlimited.
+    pub fn with_speed_limit(bytes_per_sec: u64) -> Result<Self, String> {
+        let mut engine = Self::new()?;
+        if bytes_per_sec > 0 {
+            engine.limiter = Some(Arc::new(Limiter::new(bytes_per_sec)));
+        }
+        Ok(engine)
     }
 
     pub fn with_sync_interval(sync_interval: Duration) -> Result<Self, String> {
@@ -33,7 +47,7 @@ impl Engine {
             .user_agent(concat!("fetchline/", env!("CARGO_PKG_VERSION")))
             .build()
             .map_err(|e| e.to_string())?;
-        Ok(Self { client, sync_interval })
+        Ok(Self { client, sync_interval, limiter: None })
     }
 
     /// HEAD probe: length, Range support, ETag, filename.
@@ -156,12 +170,13 @@ impl Engine {
                     continue; // already complete (resume case)
                 }
                 let client = self.client.clone();
+                let limiter = self.limiter.clone();
                 let url = url.to_string();
                 let output = output.to_path_buf();
                 let end = seg.end;
                 let done = &dones[i];
                 handles.push(scope.spawn(move || {
-                    fetch_segment(&client, &url, &output, from, end, done)
+                    fetch_segment(&client, &url, &output, from, end, done, limiter.as_deref())
                 }));
             }
             let mut first_err: Option<String> = None;
@@ -242,6 +257,7 @@ fn fetch_segment(
     start: u64,
     end: u64,
     done: &AtomicU64,
+    limiter: Option<&Limiter>,
 ) -> Result<(), String> {
     let mut attempt = 0;
     let mut offset = start;
@@ -263,6 +279,9 @@ fn fetch_segment(
                     file.write_all(&buf[..n]).map_err(|e| e.to_string())?;
                     offset += n as u64;
                     done.fetch_add(n as u64, Ordering::Relaxed);
+                    if let Some(lim) = limiter {
+                        lim.consume(n as u64);
+                    }
                 }
                 if offset > end + 1 {
                     return Err("server sent more than requested".into());
@@ -373,7 +392,8 @@ mod integration {
     }
 
     #[test]
-    fn resume_completes_partial_state() {        let port = 18767;
+    fn resume_completes_partial_state() {
+        let port = 18767;
         let size = 262_144usize;
         let mut server = start_server(port, size);
         wait_ready(port);
@@ -405,6 +425,7 @@ mod integration {
             s0.start,
             s0.end,
             &done0,
+            None,
         )
         .unwrap();
         state.segments[0].done = done0.load(Ordering::Relaxed);
@@ -413,6 +434,30 @@ mod integration {
         // Resume must finish seg1 and verify the whole file.
         let resumed = engine.resume(&state_path_for(&out)).unwrap();
         assert!(resumed.is_complete());
+        let data = fs::read(&out).unwrap();
+        assert!(data.iter().enumerate().all(|(i, b)| *b == (i % 256) as u8));
+        let _ = fs::remove_file(&out);
+        server.kill().ok();
+    }
+
+    #[test]
+    fn capped_download_stays_correct() {
+        let port = 18768;
+        let size = 262_144usize; // 256 KiB at 1 MiB/s -> fast, exercises wiring
+        let mut server = start_server(port, size);
+        wait_ready(port);
+        let dir = std::env::temp_dir().join("fetchline-m1");
+        let _ = fs::create_dir_all(&dir);
+        let out = dir.join("capped.bin");
+        let _ = fs::remove_file(&out);
+        let _ = fs::remove_file(state_path_for(&out));
+        let engine = Engine::with_speed_limit(1024 * 1024).unwrap();
+        let t = std::time::Instant::now();
+        let state = engine
+            .download(&format!("http://127.0.0.1:{port}/file.bin"), &out, 4, None)
+            .unwrap();
+        assert!(state.is_complete());
+        assert!(t.elapsed() < Duration::from_secs(20));
         let data = fs::read(&out).unwrap();
         assert!(data.iter().enumerate().all(|(i, b)| *b == (i % 256) as u8));
         let _ = fs::remove_file(&out);
