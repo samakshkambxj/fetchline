@@ -33,7 +33,20 @@ Commit style: Conventional Commits (`feat:`, `fix:`, `docs:`, `chore:`,
 Accept: 100MB file from local server downloads in N segments,
 byte-identical, pause at 50% resumes correctly.
 
-## M2 — Queue + persistence + CLI (v0.2.0)
+## M2 — Queue + persistence + CLI (v0.2.0) — done
+
+`fetchlined` + `fetchline`, verified end-to-end (isolated HOME):
+scheduled add → pause → resume → 2 MiB completed byte-identical,
+status/clear/list/shutdown. Socket `0600`, 1 MiB cap.
+
+- [x] SQLite schema: downloads, resume jobs, settings (`rusqlite` bundled)
+- [x] States: queued → active → paused → completed / failed / cancelled
+- [x] Batch add (100 URLs), schedule-at, retry-failed
+- [x] Categories: Video/Music/Images/Docs/Apps/Archives/ISO/Other under
+      `~/Downloads/fetchline/`, respect `XDG_DOWNLOAD_DIR`
+- [x] CLI: `fetchline add/list/pause/resume/cancel/clear/info`
+- [x] Unix-socket IPC `~/.local/share/fetchline/control.sock` (`0600`),
+      1MB cap, action envelope `{action, id, ...}`
 
 - [ ] SQLite schema: downloads, resume jobs, settings (`rusqlite` bundled)
 - [ ] States: queued → active → paused → completed / failed / cancelled
