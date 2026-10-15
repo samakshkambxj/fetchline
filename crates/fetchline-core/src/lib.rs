@@ -2,5 +2,6 @@
 //! fetchline-core: segmented download engine (M1).
 
 pub mod probe;
+pub mod download;
 pub mod segments;
 pub mod state;
