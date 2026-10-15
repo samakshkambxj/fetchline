@@ -24,6 +24,7 @@ jobs:
         with:
           name: cli-binaries
           path: dist/
+          if-no-files-found: error
 
   # Desktop app: needs WebKitGTK system libraries.
   app:
@@ -42,9 +43,11 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: app-bundles
+          # Workspace target dir: tauri builds into ./target, not src-tauri/target.
           path: |
-            src-tauri/target/release/bundle/appimage/*.AppImage
-            src-tauri/target/release/bundle/deb/*.deb
+            target/release/bundle/appimage/*.AppImage
+            target/release/bundle/deb/*.deb
+          if-no-files-found: error
 
   release:
     needs: [binaries, app]
