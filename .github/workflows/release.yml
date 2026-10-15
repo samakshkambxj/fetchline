@@ -1,0 +1,69 @@
+# Copyright 2026 Samaksh Kamboj - SPDX-License-Identifier: Apache-2.0
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  # CLI + daemon binaries: pure Rust, no system WebKit needed.
+  binaries:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --release -p fetchline -p fetchlined --locked
+      - run: |
+          mkdir -p dist
+          cp target/release/fetchline target/release/fetchlined dist/
+          (cd dist && sha256sum fetchline fetchlined > SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cli-binaries
+          path: dist/
+
+  # Desktop app: needs WebKitGTK system libraries.
+  app:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: System dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y libwebkit2gtk-4.1-dev build-essential curl wget \
+            file libssl-dev libgtk-3-dev libayatana-appindicator3-dev \
+            librsvg2-dev patchelf
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: tauri-apps/tauri-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "fetchline ${{ github.ref_name }}"
+          releaseDraft: false
+          prerelease: false
+          args: -- --target x86_64-unknown-linux-gnu
+
+  attach:
+    needs: [binaries, app]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: cli-binaries
+          path: dist/
+      - run: |
+          tar -czf fetchline-cli-x86_64.tar.gz -C dist fetchline fetchlined SHA256SUMS
+          sha256sum fetchline-cli-x86_64.tar.gz > dist/SHA256SUMS.cli
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: |
+            fetchline-cli-x86_64.tar.gz
