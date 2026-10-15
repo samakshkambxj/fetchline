@@ -297,11 +297,17 @@ pub(crate) fn write_state_file(path: &Path, state: &DownloadState) -> Result<(),
 }
 
 fn preallocate(path: &Path, total: u64) -> Result<(), String> {
-    let file = OpenOptions::new().create(true).write(true).open(path).map_err(|e| e.to_string())?;
+    let file = OpenOptions::new()
+        .create(true)
+        .truncate(true)
+        .write(true)
+        .open(path)
+        .map_err(|e| e.to_string())?;
     file.set_len(total).map_err(|e| e.to_string())?;
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)] // one internal caller; a struct adds noise
 fn fetch_segment(
     client: &reqwest::blocking::Client,
     url: &str,
@@ -430,6 +436,7 @@ mod integration {
         assert!(!state_path_for(&out).exists(), "state cleaned up");
         let _ = fs::remove_file(&out);
         server.kill().ok();
+        let _ = server.wait();
     }
 
     #[test]
@@ -496,6 +503,7 @@ mod integration {
         assert!(data.iter().enumerate().all(|(i, b)| *b == (i % 256) as u8));
         let _ = fs::remove_file(&out);
         server.kill().ok();
+        let _ = server.wait();
     }
 
     #[test]
@@ -529,6 +537,7 @@ mod integration {
         assert!(data.iter().enumerate().all(|(i, b)| *b == (i % 256) as u8));
         let _ = fs::remove_file(dir.join("paused.bin"));
         server.kill().ok();
+        let _ = server.wait();
     }
 
     #[test]
@@ -553,5 +562,6 @@ mod integration {
         assert!(data.iter().enumerate().all(|(i, b)| *b == (i % 256) as u8));
         let _ = fs::remove_file(&out);
         server.kill().ok();
+        let _ = server.wait();
     }
 }
