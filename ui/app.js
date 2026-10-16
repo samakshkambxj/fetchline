@@ -80,6 +80,9 @@
   }
 
   async function refresh() {
+    const live = window.TauriBackend && backend() instanceof window.TauriBackend;
+    const note = $("#backend-note");
+    if (note) note.textContent = live ? "Backend: live daemon" : "Backend: demo data";
     try {
       items = await backend().list();
     } catch (e) {

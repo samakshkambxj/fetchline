@@ -806,7 +806,7 @@ dependencies = [
 
 [[package]]
 name = "fetchline-app"
-version = "0.1.0"
+version = "0.1.2"
 dependencies = [
  "fetchline-core",
  "serde",

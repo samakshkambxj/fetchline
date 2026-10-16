@@ -247,6 +247,7 @@ main { flex: 1; overflow-y: auto; padding: 4px 28px 28px; }
 .setting-row:first-of-type { border-top: 0; }
 .setting-name { display: block; }
 .setting-sub { display: block; font: var(--md-sys-typescale-body-m); color: var(--md-sys-color-on-surface-variant); }
+.backend-note { font: var(--md-sys-typescale-body-m); color: var(--md-sys-color-on-surface-variant); margin: 4px 0 12px; }
 
 .segmented {
   display: inline-flex;

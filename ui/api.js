@@ -40,9 +40,24 @@ class MockBackend {
 }
 // TauriBackend speaks to fetchlined through the app shell's invoke
 // handlers (src-tauri/src/proxy.rs). Same method surface as MockBackend.
-// Detection uses window.__TAURI_INVOKE__, the stable primitive the
-// official @tauri-apps/api client itself calls (window.__TAURI__.core
-// is not populated in Tauri v2 webviews).
+// Detection covers every known Tauri webview surface:
+// - Tauri v2: window.__TAURI_INTERNALS__.invoke
+// - Tauri v1 compat: window.__TAURI_INVOKE__
+// - Namespace object, if populated: window.__TAURI__.core.invoke
+function tauriInvokeFn() {
+  if (typeof window.__TAURI_INVOKE__ === "function") {
+    return (cmd, args) => window.__TAURI_INVOKE__(cmd, args);
+  }
+  const internals = window.__TAURI_INTERNALS__;
+  if (internals && typeof internals.invoke === "function") {
+    return (cmd, args) => internals.invoke(cmd, args);
+  }
+  const ns = window.__TAURI__;
+  if (ns && ns.core && typeof ns.core.invoke === "function") {
+    return (cmd, args) => ns.core.invoke(cmd, args);
+  }
+  return null;
+}
 class TauriBackend {
   constructor(invoke) {
     this.invoke = invoke;
@@ -71,8 +86,9 @@ class TauriBackend {
     document.dispatchEvent(new CustomEvent("fetchline:update"));
   }
 }
-if (typeof window.__TAURI_INVOKE__ === "function") {
-  window.fetchlineBackend = new TauriBackend(window.__TAURI_INVOKE__);
+const tauriInvoke = tauriInvokeFn();
+if (tauriInvoke) {
+  window.fetchlineBackend = new TauriBackend(tauriInvoke);
 } else {
   window.fetchlineBackend = new MockBackend();
 }
